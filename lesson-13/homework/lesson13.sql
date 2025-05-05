@@ -98,3 +98,77 @@ SELECT
   MAX(CASE WHEN MinRank = 1 THEN SpacemanID END) AS LeastExperiencedSpaceman
 FROM ExperienceCTE
 GROUP BY JobDescription;
+-- 1. Separate uppercase, lowercase, numbers, and special characters from a string
+DECLARE @input VARCHAR(100) = 'tf56sd#%OqH';
+
+SELECT 
+  @input AS OriginalString,
+  (
+    SELECT STRING_AGG(SUBSTRING(@input, v.number, 1), '')
+    FROM master.dbo.spt_values v
+    WHERE v.type = 'P' AND v.number BETWEEN 1 AND LEN(@input)
+      AND SUBSTRING(@input, v.number, 1) COLLATE Latin1_General_CS_AS LIKE '[A-Z]'
+  ) AS UppercaseLetters,
+  (
+    SELECT STRING_AGG(SUBSTRING(@input, v.number, 1), '')
+    FROM master.dbo.spt_values v
+    WHERE v.type = 'P' AND v.number BETWEEN 1 AND LEN(@input)
+      AND SUBSTRING(@input, v.number, 1) COLLATE Latin1_General_CS_AS LIKE '[a-z]'
+  ) AS LowercaseLetters,
+  (
+    SELECT STRING_AGG(SUBSTRING(@input, v.number, 1), '')
+    FROM master.dbo.spt_values v
+    WHERE v.type = 'P' AND v.number BETWEEN 1 AND LEN(@input)
+      AND SUBSTRING(@input, v.number, 1) LIKE '[0-9]'
+  ) AS Numbers,
+  (
+    SELECT STRING_AGG(SUBSTRING(@input, v.number, 1), '')
+    FROM master.dbo.spt_values v
+    WHERE v.type = 'P' AND v.number BETWEEN 1 AND LEN(@input)
+      AND SUBSTRING(@input, v.number, 1) NOT LIKE '[A-Za-z0-9]'
+  ) AS SpecialCharacters;
+
+
+-- 2. Replace each row with running total of its values (Students table assumed to have ID and Score columns)
+SELECT 
+  ID,
+  Score,
+  SUM(Score) OVER (ORDER BY ID ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS RunningTotal
+FROM Students;
+
+
+-- 3. Evaluate and sum mathematical equations in VARCHAR column (Equations)
+-- Assuming Equation column has expressions like '2+3', '4*5', etc.
+-- Requires SQL CLR or a custom parser — basic simulation using REPLACE + EXEC
+-- Limited to only + operations for demo
+SELECT 
+  Equation,
+  SUM(CAST(PARSENAME(REPLACE(Equation, '+', '.'), 2) AS INT) +
+      CAST(PARSENAME(REPLACE(Equation, '+', '.'), 1) AS INT)) AS Answer
+FROM Equations
+GROUP BY Equation;
+
+
+-- 4. Find students with the same birthday (Student table assumed to have ID, Name, and BirthDate)
+SELECT *
+FROM Student
+WHERE CONVERT(VARCHAR(5), BirthDate, 110) IN (
+  SELECT CONVERT(VARCHAR(5), BirthDate, 110)
+  FROM Student
+  GROUP BY CONVERT(VARCHAR(5), BirthDate, 110)
+  HAVING COUNT(*) > 1
+)
+ORDER BY BirthDate;
+
+
+-- 5. Aggregate scores for unique player pairs regardless of order (PlayerScores)
+-- Assuming columns: PlayerA, PlayerB, Score
+SELECT 
+  CASE WHEN PlayerA < PlayerB THEN PlayerA ELSE PlayerB END AS Player1,
+  CASE WHEN PlayerA < PlayerB THEN PlayerB ELSE PlayerA END AS Player2,
+  SUM(Score) AS TotalScore
+FROM PlayerScores
+GROUP BY 
+  CASE WHEN PlayerA < PlayerB THEN PlayerA ELSE PlayerB END,
+  CASE WHEN PlayerA < PlayerB THEN PlayerB ELSE PlayerA END;
+
