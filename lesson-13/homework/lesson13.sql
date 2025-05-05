@@ -38,3 +38,63 @@ ORDER BY CASE WHEN id = 0 THEN 1 ELSE 0 END, id;
 -- 8. Select first non-null value from columns
 SELECT COALESCE(column1, column2, column3, column4) AS first_non_null
 FROM person;
+-- 1. Split FullName into Firstname, Middlename, and Lastname (Students Table)
+SELECT 
+  FullName,
+  PARSENAME(REPLACE(FullName, ' ', '.'), 3) AS Firstname,
+  PARSENAME(REPLACE(FullName, ' ', '.'), 2) AS Middlename,
+  PARSENAME(REPLACE(FullName, ' ', '.'), 1) AS Lastname
+FROM Students;
+
+
+-- 2. Customer orders delivered to Texas if they had a delivery to California (Orders Table)
+SELECT *
+FROM Orders
+WHERE DeliveryState = 'Texas'
+  AND CustomerID IN (
+    SELECT CustomerID
+    FROM Orders
+    WHERE DeliveryState = 'California'
+  );
+
+
+-- 3. Group concatenate values (DMLTable)
+SELECT 
+  STRING_AGG(ColumnName, ', ') AS ConcatenatedValues
+FROM DMLTable;
+
+
+-- 4. Employees whose full names contain the letter 'a' at least 3 times
+SELECT *
+FROM Employees
+WHERE LEN(FirstName + LastName) 
+      - LEN(REPLACE(FirstName + LastName, 'a', '')) >= 3;
+
+
+-- 5. Total employees in each department and percentage with >3 years experience
+SELECT 
+  DepartmentID,
+  COUNT(*) AS TotalEmployees,
+  SUM(CASE WHEN DATEDIFF(YEAR, HireDate, GETDATE()) > 3 THEN 1 ELSE 0 END) AS MoreThan3Years,
+  CAST(SUM(CASE WHEN DATEDIFF(YEAR, HireDate, GETDATE()) > 3 THEN 1 ELSE 0 END) * 100.0 
+       / COUNT(*) AS DECIMAL(5,2)) AS PercentageMoreThan3Years
+FROM Employees
+GROUP BY DepartmentID;
+
+
+-- 6. Most and least experienced Spaceman ID by Job Description (Personal Table)
+WITH ExperienceCTE AS (
+  SELECT 
+    JobDescription,
+    SpacemanID,
+    ExperienceYears,
+    RANK() OVER (PARTITION BY JobDescription ORDER BY ExperienceYears DESC) AS MaxRank,
+    RANK() OVER (PARTITION BY JobDescription ORDER BY ExperienceYears ASC) AS MinRank
+  FROM Personal
+)
+SELECT 
+  JobDescription,
+  MAX(CASE WHEN MaxRank = 1 THEN SpacemanID END) AS MostExperiencedSpaceman,
+  MAX(CASE WHEN MinRank = 1 THEN SpacemanID END) AS LeastExperiencedSpaceman
+FROM ExperienceCTE
+GROUP BY JobDescription;
